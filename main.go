@@ -16,8 +16,8 @@ import (
 )
 
 type ArticleResult struct {
-	title string
-	url   string
+	Title string `json:"title"`
+	URL   string `json:"url"`
 	score float64
 }
 
@@ -111,11 +111,12 @@ func getHighestScore(titlesList []ArticleResult) int {
 var filter = flag.String("filter", "", "filter articles with specific keyword")
 var number = flag.Int("number", 10, "number of articles to display")
 var noInput = flag.Bool("no-input", false, "do not wait for user input, can be used for scripting")
+var jsonOutput = flag.Bool("json", false, "output in json format")
 
 func main() {
 	flag.Parse()
 	const DEFAULT_ARTICLE_NUMBER = 10
-	if (!*noInput) {
+	if (!*noInput && !*jsonOutput) {
 		fmt.Println("Hello Hackers News!")
 	}
 	body, err := getBodyFromUrl("https://hacker-news.firebaseio.com/v0/topstories.json")
@@ -138,15 +139,24 @@ func main() {
 
 	if *filter != "" {
 		titlesList = lo.Filter(titlesList, func(art ArticleResult, index int) bool {
-			return strings.Contains(art.title, *filter)
+			return strings.Contains(art.Title, *filter)
 		})
 	}
 
 	if *noInput {
 		for _, value := range titlesList {
 			// For some reason fmt.Println(value.title) does not work with wc -l
-			fmt.Printf("%s ~ %s\n", value.title, value.url)
+			fmt.Printf("%s ~ %s\n", value.Title, value.URL)
 		}
+		return
+	}
+
+	if *jsonOutput {
+		jsonString, err := json.Marshal(titlesList)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(jsonString))
 		return
 	}
 
@@ -158,9 +168,9 @@ func main() {
 	highestIndex := getHighestScore(titlesList)
 	for num, value := range titlesList {
 		if num == highestIndex {
-			fmt.Printf("%d: %s ⭐\n", num+1, value.title)
+			fmt.Printf("%d: %s ⭐\n", num+1, value.Title)
 		} else {
-			fmt.Printf("%d: %s\n", num+1, value.title)
+			fmt.Printf("%d: %s\n", num+1, value.Title)
 		}
 	}
 
@@ -177,6 +187,6 @@ func main() {
 		fmt.Println("There is no such article 🤦")
 		os.Exit(1)
 	}
-	fmt.Println(titlesList[number-1].url)
-	exec.Command("firefox", titlesList[number-1].url).Run()
+	fmt.Println(titlesList[number-1].URL)
+	exec.Command("firefox", titlesList[number-1].URL).Run()
 }
