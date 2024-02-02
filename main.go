@@ -116,7 +116,7 @@ var jsonOutput = flag.Bool("json", false, "output in json format")
 func main() {
 	flag.Parse()
 	const DEFAULT_ARTICLE_NUMBER = 10
-	if (!*noInput && !*jsonOutput) {
+	if !*noInput && !*jsonOutput {
 		fmt.Println("Hello Hackers News!")
 	}
 	body, err := getBodyFromUrl("https://hacker-news.firebaseio.com/v0/topstories.json")
