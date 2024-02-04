@@ -42,7 +42,7 @@ func getBodyFromUrl(url string) ([]byte, error) {
 func fetchTitles(size int, articleIDs []int) ([]ArticleResult, error) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	// Handles case when there are not enought articles fetched
+	// Handles case when there are not enough articles fetched
 	if size > len(articleIDs) {
 		size = len(articleIDs)
 	}
@@ -108,10 +108,12 @@ func getHighestScore(titlesList []ArticleResult) int {
 	return highestIndex
 }
 
-var filter = flag.String("filter", "", "filter articles with specific keyword")
-var number = flag.Int("number", 10, "number of articles to display")
-var noInput = flag.Bool("no-input", false, "do not wait for user input, can be used for scripting")
-var jsonOutput = flag.Bool("json", false, "output in json format")
+var (
+	filter     = flag.String("filter", "", "filter articles with specific keyword")
+	number     = flag.Int("number", 10, "number of articles to display")
+	noInput    = flag.Bool("no-input", false, "do not wait for user input, can be used for scripting")
+	jsonOutput = flag.Bool("json", false, "output in json format")
+)
 
 func main() {
 	flag.Parse()
@@ -120,7 +122,6 @@ func main() {
 		fmt.Println("Hello Hackers News!")
 	}
 	body, err := getBodyFromUrl("https://hacker-news.firebaseio.com/v0/topstories.json")
-
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
@@ -178,7 +179,6 @@ func main() {
 
 	var number int64
 	_, err = fmt.Scanf("%d", &number)
-
 	if err != nil {
 		fmt.Println("Could not get URL if the article 😞")
 		os.Exit(1)
