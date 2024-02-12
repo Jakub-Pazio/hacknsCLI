@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,19 +12,28 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/samber/lo"
 )
 
 type ArticleResult struct {
-	Title string `json:"title"`
-	URL   string `json:"url"`
-	score float64
+	Title string  `json:"title"`
+	URL   string  `json:"url"`
+	Score float64 // unexported field, should be Score
 }
 
 // Returns body after http request to provided URL
 func getBodyFromUrl(url string) ([]byte, error) {
-	response, err := http.Get(url)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*maxTime)*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +49,7 @@ func getBodyFromUrl(url string) ([]byte, error) {
 	return body, nil
 }
 
-func fetchTitles(size int, articleIDs []int) ([]ArticleResult, error) {
+func fetchTitles(ctx context.Context, size int, articleIDs []int) ([]ArticleResult, error) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	// Handles case when there are not enough articles fetched
@@ -57,37 +67,42 @@ func fetchTitles(size int, articleIDs []int) ([]ArticleResult, error) {
 			articleURL += numString
 			articleURL += ".json"
 
-			body, err := getBodyFromUrl(articleURL)
-			if err != nil {
-				fmt.Println("Error: ", err)
-				return
-			} else {
-				var dataMap map[string]interface{}
+			select {
+			case <-ctx.Done():
+				return // exit if the context is canceled
+			default:
+				body, err := getBodyFromUrl(articleURL)
+				if err != nil {
+					// fmt.Println("Error: ", err)
+					return
+				} else {
+					var dataMap map[string]interface{}
 
-				if err := json.Unmarshal(body, &dataMap); err != nil {
-					fmt.Println("Error:", err)
-					return
-				}
+					if err := json.Unmarshal(body, &dataMap); err != nil {
+						fmt.Println("Error:", err)
+						return
+					}
 
-				title, ok := dataMap["title"].(string)
-				if !ok {
-					fmt.Println("Error: 'title' key is not a string")
-					return
-				}
-				url, ok := dataMap["url"].(string)
-				if !ok {
-					// fmt.Println("Error: 'url' key is not a string")
-					return
-				}
+					title, ok := dataMap["title"].(string)
+					if !ok {
+						fmt.Println("Error: 'title' key is not a string")
+						return
+					}
+					url, ok := dataMap["url"].(string)
+					if !ok {
+						// fmt.Println("Error: 'url' key is not a string")
+						return
+					}
 
-				score, ok := dataMap["score"].(float64)
-				if !ok {
-					fmt.Println("Error: 'score' key is not an int")
-					return
+					Score, ok := dataMap["score"].(float64)
+					if !ok {
+						fmt.Println("Error: 'Score' key is not an int")
+						return
+					}
+					mu.Lock()
+					result[i] = ArticleResult{title, url, Score}
+					mu.Unlock()
 				}
-				mu.Lock()
-				result[i] = ArticleResult{title, url, score}
-				mu.Unlock()
 			}
 		}(i)
 	}
@@ -96,12 +111,12 @@ func fetchTitles(size int, articleIDs []int) ([]ArticleResult, error) {
 }
 
 func getHighestScore(titlesList []ArticleResult) int {
-	highestScore := titlesList[0].score
+	highestScore := titlesList[0].Score
 	highestIndex := 0
 
-	for num, score := range titlesList {
-		if score.score > highestScore {
-			highestScore = score.score
+	for num, Score := range titlesList {
+		if Score.Score > highestScore {
+			highestScore = Score.Score
 			highestIndex = num
 		}
 	}
@@ -113,6 +128,7 @@ var (
 	number     = flag.Int("number", 10, "number of articles to display")
 	noInput    = flag.Bool("no-input", false, "do not wait for user input, can be used for scripting")
 	jsonOutput = flag.Bool("json", false, "output in json format")
+	maxTime    = flag.Int("max-time", 10, "maximum time to wait for article")
 )
 
 func main() {
@@ -132,7 +148,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	titlesList, err := fetchTitles(*number, articleIDs)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*maxTime)*time.Second)
+	defer cancel()
+
+	titlesList, err := fetchTitles(ctx, *number, articleIDs)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
