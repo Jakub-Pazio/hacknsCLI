@@ -23,7 +23,6 @@ type ArticleResult struct {
 	Score float64 // unexported field, should be Score
 }
 
-// Returns body after http request to provided URL
 func getBodyFromUrl(url string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*maxTime)*time.Second)
 	defer cancel()
